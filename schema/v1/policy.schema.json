@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coldsofttech.github.io/vethuq-policy/schema/v1/policy.schema.json",
+  "title": "VethuQ policy payload (schema v1)",
+  "description": "The payload carried inside the signed envelope. Changes within schema major 1 are additive only; clients MUST ignore unknown fields, so additionalProperties is intentionally left open everywhere.",
+  "type": "object",
+  "required": ["schema_version", "sequence", "issued_at", "kid", "versions"],
+  "properties": {
+    "schema_version": {
+      "description": "Schema major version. Always 1 for payloads served from /v1/.",
+      "const": 1
+    },
+    "sequence": {
+      "description": "Monotonic sequence number. Clients reject a policy whose sequence is lower than the last one they accepted (rollback protection).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "issued_at": {
+      "description": "UTC time the policy was signed (RFC 3339).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "kid": {
+      "description": "Id of the signing key. Must equal the kid in the envelope.",
+      "$ref": "#/$defs/kid"
+    },
+    "versions": {
+      "description": "Latest and minimum supported versions per distribution.",
+      "type": "object",
+      "required": ["desktop", "pip"],
+      "properties": {
+        "desktop": { "$ref": "#/$defs/distribution" },
+        "pip": { "$ref": "#/$defs/distribution" }
+      }
+    },
+    "compatibility": {
+      "description": "Compatibility constraints.",
+      "type": "object",
+      "properties": {
+        "addon_api": {
+          "description": "Inclusive add-on API version range supported by the latest release.",
+          "type": "object",
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "$ref": "#/$defs/semver" },
+            "max": { "$ref": "#/$defs/semver" }
+          }
+        }
+      }
+    },
+    "notices": {
+      "description": "User-facing notices. A notice is shown only inside its optional starts_at/ends_at window.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/notice" }
+    },
+    "features": {
+      "description": "Feature flags keyed by flag name. Setting enabled=false is also the remote kill switch for a feature.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/$defs/feature" }
+    },
+    "limits": {
+      "description": "Time-boxed limit adjustments and promotions. Structure only; empty in the initial v1 policies.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/limit" }
+    },
+    "revocations": {
+      "description": "Revoked licence ids. Reserved: MUST be empty in v1. Clients ignore it until a later additive change defines its use.",
+      "type": "array",
+      "maxItems": 0,
+      "items": { "$ref": "#/$defs/revocation" }
+    }
+  },
+  "$defs": {
+    "kid": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "distribution": {
+      "type": "object",
+      "required": ["latest", "minimum_supported"],
+      "properties": {
+        "latest": { "$ref": "#/$defs/semver" },
+        "minimum_supported": {
+          "description": "Clients older than this are told they must update.",
+          "$ref": "#/$defs/semver"
+        },
+        "release_notes_url": { "$ref": "#/$defs/url" },
+        "downloads": {
+          "description": "Per-platform download entries. Used by the desktop distribution; pip normally omits it.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/download" }
+        }
+      }
+    },
+    "download": {
+      "type": "object",
+      "required": ["platform", "url", "size", "sha256"],
+      "properties": {
+        "platform": {
+          "description": "Platform identifier, e.g. windows-x64, macos-arm64, linux-x64.",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9_]+)*$"
+        },
+        "url": { "$ref": "#/$defs/url" },
+        "size": { "description": "Size in bytes.", "type": "integer", "minimum": 1 },
+        "sha256": { "description": "Lowercase hex SHA-256 of the file.", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "notice": {
+      "type": "object",
+      "required": ["id", "message", "severity"],
+      "properties": {
+        "id": { "description": "Stable id so clients can remember a dismissed notice.", "type": "string", "minLength": 1, "maxLength": 64 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "severity": { "enum": ["info", "warning", "critical"] },
+        "link": { "$ref": "#/$defs/url" },
+        "starts_at": { "type": "string", "format": "date-time" },
+        "ends_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "min_client": {
+          "description": "The flag applies only to clients at or above this version.",
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "limit": {
+      "type": "object",
+      "required": ["id", "kind", "starts_at", "ends_at", "adjustments"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "kind": { "enum": ["limit_adjustment", "promotion"] },
+        "starts_at": { "type": "string", "format": "date-time" },
+        "ends_at": { "type": "string", "format": "date-time" },
+        "min_client": { "$ref": "#/$defs/semver" },
+        "adjustments": {
+          "description": "Named adjustments applied while the window is active, e.g. {\"max_vaults\": 10}.",
+          "type": "object",
+          "additionalProperties": { "type": ["number", "boolean", "string"] }
+        }
+      }
+    },
+    "revocation": {
+      "type": "object",
+      "required": ["license_id"],
+      "properties": {
+        "license_id": { "type": "string", "minLength": 1 },
+        "revoked_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
