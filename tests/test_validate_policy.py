@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import validate_policy as vp  # noqa: E402
 
+VALIDATOR = vp.PolicyValidator()
+
 
 def b64(b):
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
@@ -41,7 +43,7 @@ def payload(**over):
 
 
 def errs(env, keys, prev=None):
-    return vp.check_envelope(env, keys, prev)[0]
+    return vp.PolicyValidator(keys_dir=keys).validate_envelope(env, prev)[0]
 
 
 def test_valid_envelope_passes(signer):
@@ -51,12 +53,12 @@ def test_valid_envelope_passes(signer):
 
 def test_examples_pass():
     for f in (ROOT / "examples/v1").glob("*.payload.json"):
-        assert vp.check_payload(json.loads(f.read_text())) == [], f.name
+        assert VALIDATOR.validate_payload(json.loads(f.read_text())) == [], f.name
 
 
 def test_example_envelope_matches_envelope_schema():
     env = json.loads((ROOT / "examples/v1/envelope.example.json").read_text())
-    assert vp.schema_errors(env, "envelope.schema.json") == []
+    assert VALIDATOR.schema_errors(env, "envelope.schema.json") == []
 
 
 def test_schema_violation(signer):
