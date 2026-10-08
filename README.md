@@ -17,8 +17,14 @@ public and contains **only signed, non-secret data**.
 .nojekyll        # disables Jekyll so files are served as-is
 v1/
   index.html     # placeholder so /v1/ resolves
-  policy.json    # signed policy for v1 clients (added once signing tooling exists)
+  policy.json    # signed envelope for v1 clients (currently an unsigned placeholder)
+schema/v1/       # JSON Schemas: envelope + payload
+docs/            # field documentation and envelope format
+examples/v1/     # illustrative unsigned payloads (not live policy)
 ```
+
+See [docs/schema-v1.md](docs/schema-v1.md) for the fields and compatibility rules and
+[docs/envelope.md](docs/envelope.md) for the signed envelope format.
 
 `/v1/` is a stable contract: it stays alive for old clients even if a `/v2/`
 appears later. Never repurpose or remove a published version path.
