@@ -53,6 +53,23 @@ rely on the signature and the policy's own validity fields, never on fetch fresh
 
 This repository only ever receives signed output. Unsigned drafts are not authored here.
 
+## CI checks
+
+The `policy-ci` workflow runs on every push and PR, with no secrets (public keys only). It runs the
+unit tests, validates the example payloads, and validates `v1/policy.json`:
+
+- envelope and payload schema (`schema/v1/`)
+- Ed25519 signature against the public key `keys/<kid>.pub` (see [keys/README.md](keys/README.md))
+- `sequence` strictly greater than the previous commit's `v1/policy.json` (only when the file changed)
+- notice and limit windows (`starts_at` before `ends_at`, real dates), URL, sha256 and version formats
+
+Run locally: `pip install -r requirements-ci.txt && python -m pytest tests &&
+python scripts/validate_policy.py envelope v1/policy.json`.
+
+While `v1/policy.json` is the documented unsigned placeholder (`"_placeholder": true`), the check
+passes with a warning. Once the first signed policy is committed, the placeholder is no longer accepted
+there as soon as a signed file replaces it, and it must verify like any other.
+
 ## Never commit
 
 - Private keys or key material of any kind
