@@ -40,7 +40,8 @@ The client embeds this ordered list and tries each in turn:
 | 3 | Mirror (raw) | `https://raw.githubusercontent.com/coldsofttech/vethuq-policy/main/v1/policy.json` |
 
 A custom domain is optional; if added, it goes first in the list and the URLs above
-remain as fallbacks. Mirrors may be cached (jsDelivr in particular), so clients must
+remain as fallbacks. How the list is used and how to move hosts without a client release:
+[docs/hosting-and-mirrors.md](docs/hosting-and-mirrors.md). Mirrors may be cached (jsDelivr in particular), so clients must
 rely on the signature and the policy's own validity fields, never on fetch freshness.
 
 ## Publishing flow
@@ -52,6 +53,12 @@ rely on the signature and the policy's own validity fields, never on fetch fresh
    `Content-Type: application/json`.
 
 This repository only ever receives signed output. Unsigned drafts are not authored here.
+
+## Protection and hosting terms
+
+- `main` protection (PR + required `validate` check, no force-push or deletion):
+  [docs/branch-protection.md](docs/branch-protection.md)
+- GitHub Pages acceptable-use review: [docs/acceptable-use.md](docs/acceptable-use.md)
 
 ## CI checks
 
