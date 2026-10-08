@@ -4,14 +4,23 @@
 
 ## Rules
 
-| Rule | Why |
-|---|---|
-| Require a pull request before merging | Every policy change is reviewable and goes through CI |
-| Require status check **`validate`** to pass | The `policy-ci` workflow job: schema, signature, sequence, windows, tests |
-| Block force pushes (`non_fast_forward`) | Published history, and the sequence-number check, rely on linear history |
-| Block deletion | `main` must not disappear |
-| Required approvals: **0** | This is a single-maintainer repo; raise it when a second maintainer exists |
-| Bypass actors: none | The rules apply to admins too |
+| Rule | Setting | Why |
+|---|---|---|
+| Restrict deletions | on | `main` must not disappear |
+| Block force pushes | on | Published history and the sequence-number check rely on it |
+| Require deployments to succeed | on, **no environments selected** | See the note below |
+| Require a pull request before merging | on, 0 approvals | Every change is reviewable and goes through CI; single maintainer, raise it when there is a second one |
+| - Dismiss stale approvals on new commits | on | |
+| - Require conversation resolution | on | |
+| Require status checks to pass | on, `validate` required, branch must be up to date | The `policy-ci` job: schema, signature, sequence, windows, tests |
+| Require code scanning results | on, CodeQL: security alerts high or higher, alerts errors | |
+| Require code quality results | on, severity errors | |
+| Restrict creations/updates, linear history, signed commits, code coverage, Copilot review | off | |
+| Bypass actors | none | The rules apply to admins too |
+
+**Deployments rule:** it is included because it is enabled on the live ruleset, but no environment is
+selected, so it blocks nothing. Do not select `github-pages` here: Pages deploys only *after* a push
+to `main`, so requiring it as a precondition would block every merge.
 
 The ruleset is committed at [`.github/rulesets/protect-main.json`](../.github/rulesets/protect-main.json).
 It is a record and an import file; GitHub does not apply it automatically.
@@ -20,7 +29,7 @@ It is a record and an import file; GitHub does not apply it automatically.
 
 1. Repo -> Settings -> Rules -> Rulesets -> New ruleset -> **Import a ruleset**.
 2. Choose `.github/rulesets/protect-main.json` and confirm.
-3. Check that the status check shows as `validate` (it appears in the picker only after the workflow has run once).
+3. Check that the required status check shows as `validate` (it appears in the picker after the workflow has run once; the screenshot of an in-progress ruleset showed none added yet).
 4. Open a test PR and confirm merging is blocked until `validate` is green.
 
 Manual equivalent: Settings -> Rules -> New branch ruleset -> target the default branch ->

@@ -54,11 +54,10 @@ rely on the signature and the policy's own validity fields, never on fetch fresh
 
 This repository only ever receives signed output. Unsigned drafts are not authored here.
 
-## Protection and hosting terms
+## Protection
 
 - `main` protection (PR + required `validate` check, no force-push or deletion):
   [docs/branch-protection.md](docs/branch-protection.md)
-- GitHub Pages acceptable-use review: [docs/acceptable-use.md](docs/acceptable-use.md)
 
 ## CI checks
 
