@@ -66,6 +66,12 @@ unit tests, validates the example payloads, and validates `v1/policy.json`:
 Run locally: `pip install -r requirements-ci.txt && python -m pytest tests &&
 python scripts/validate_policy.py envelope v1/policy.json`.
 
+### Pre-commit
+
+`pip install pre-commit && pre-commit install` runs on each commit: whitespace/EOF/YAML/JSON checks,
+private-key detection, `ruff` lint and format, the policy checks (`scripts/check_policy.sh`) and the tests.
+Run everything with `pre-commit run --all-files`.
+
 While `v1/policy.json` is the documented unsigned placeholder (`"_placeholder": true`), the check
 passes with a warning. Once the first signed policy is committed, the placeholder is no longer accepted
 there as soon as a signed file replaces it, and it must verify like any other.

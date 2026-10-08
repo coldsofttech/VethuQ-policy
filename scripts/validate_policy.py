@@ -12,6 +12,7 @@ changed, that sequence is strictly greater than the previous one.
 Exit code 0 = valid, 1 = invalid. A file that is exactly the documented unsigned
 placeholder (`"_placeholder": true`) is accepted with a warning until the first signed policy lands.
 """
+
 import argparse
 import base64
 import binascii
@@ -51,14 +52,14 @@ class PolicyValidator:
         try:
             return json.loads(Path(path).read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
-            raise PolicyError(f"cannot read {path}: {e}")
+            raise PolicyError(f"cannot read {path}: {e}") from e
 
     @staticmethod
     def b64url_decode(s):
         try:
             return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
         except (binascii.Error, ValueError) as e:
-            raise PolicyError(f"invalid base64url: {e}")
+            raise PolicyError(f"invalid base64url: {e}") from e
 
     @staticmethod
     def is_placeholder(doc):
@@ -96,7 +97,7 @@ class PolicyValidator:
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            raise PolicyError(f"{where}: impossible or malformed date: {value!r}")
+            raise PolicyError(f"{where}: impossible or malformed date: {value!r}") from None
 
     def _semver(self, s):
         return tuple(int(x) for x in self.SEMVER_RE.match(s).groups())

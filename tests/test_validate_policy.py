@@ -30,9 +30,7 @@ class Signer:
 
     def __init__(self, keys_dir):
         self.private_key = Ed25519PrivateKey.generate()
-        pub = self.private_key.public_key().public_bytes(
-            serialization.Encoding.Raw, serialization.PublicFormat.Raw
-        )
+        pub = self.private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self.keys_dir = keys_dir
         keys_dir.mkdir()
         (keys_dir / f"{KID}.pub").write_text(b64(pub))
@@ -90,14 +88,16 @@ class TestSchema(ValidatorTestCase):
         env = signer.sign(make_payload(future_field={"a": 1}))
         assert self.envelope_errors(validator, env) == []
 
-    @pytest.mark.parametrize("field,value", [
-        ("sha256", "xyz"),
-        ("url", "http://example.com/a.exe"),
-        ("size", 0),
-    ])
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("sha256", "xyz"),
+            ("url", "http://example.com/a.exe"),
+            ("size", 0),
+        ],
+    )
     def test_download_format_checks(self, signer, validator, field, value):
-        download = {"platform": "windows-x64", "url": "https://example.com/a.exe",
-                    "size": 10, "sha256": "a" * 64}
+        download = {"platform": "windows-x64", "url": "https://example.com/a.exe", "size": 10, "sha256": "a" * 64}
         download[field] = value
         p = make_payload()
         p["versions"]["desktop"]["downloads"] = [download]
@@ -148,20 +148,27 @@ class TestSequence(ValidatorTestCase):
 
 
 class TestWindows(ValidatorTestCase):
-    @pytest.mark.parametrize("starts,ends", [
-        ("2026-11-02T00:00:00Z", "2026-11-01T00:00:00Z"),  # end before start
-        ("2026-11-01T00:00:00Z", "2026-11-01T00:00:00Z"),  # empty window
-        ("2026-02-30T00:00:00Z", "2026-03-01T00:00:00Z"),  # impossible date
-        ("2026-11-01", "2026-11-02T00:00:00Z"),            # no time / timezone
-    ])
+    @pytest.mark.parametrize(
+        "starts,ends",
+        [
+            ("2026-11-02T00:00:00Z", "2026-11-01T00:00:00Z"),  # end before start
+            ("2026-11-01T00:00:00Z", "2026-11-01T00:00:00Z"),  # empty window
+            ("2026-02-30T00:00:00Z", "2026-03-01T00:00:00Z"),  # impossible date
+            ("2026-11-01", "2026-11-02T00:00:00Z"),  # no time / timezone
+        ],
+    )
     def test_invalid_notice_window(self, signer, validator, starts, ends):
-        notices = [{"id": "n", "message": "m", "severity": "info",
-                    "starts_at": starts, "ends_at": ends}]
+        notices = [{"id": "n", "message": "m", "severity": "info", "starts_at": starts, "ends_at": ends}]
         assert self.envelope_errors(validator, signer.sign(make_payload(notices=notices)))
 
     def test_limit_window_ordered(self, signer, validator):
-        ok = {"id": "p", "kind": "promotion", "starts_at": "2026-11-01T00:00:00Z",
-              "ends_at": "2026-11-02T00:00:00Z", "adjustments": {"a": 1}}
+        ok = {
+            "id": "p",
+            "kind": "promotion",
+            "starts_at": "2026-11-01T00:00:00Z",
+            "ends_at": "2026-11-02T00:00:00Z",
+            "adjustments": {"a": 1},
+        }
         assert self.envelope_errors(validator, signer.sign(make_payload(limits=[ok]))) == []
         bad = dict(ok, ends_at="2026-10-01T00:00:00Z")
         assert self.envelope_errors(validator, signer.sign(make_payload(limits=[bad])))
