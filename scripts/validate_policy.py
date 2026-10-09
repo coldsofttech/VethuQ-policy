@@ -19,7 +19,7 @@ import binascii
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
@@ -138,6 +138,92 @@ class PolicyValidator:
                     errs.append("compatibility.addon_api: min is greater than max")
             except (KeyError, AttributeError, TypeError):
                 pass
+        errs += self.credit_errors(p)
+        return errs
+
+    # ---- credits sections (rate card, wallets, promotions, caps, metrics) -------
+
+    DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    DEFAULT_METRICS_BONUS_CAP = 15
+    CREDIT_SECTIONS = ("rate_card", "wallets", "caps")
+
+    def parse_date(self, value, where):
+        """Strict YYYY-MM-DD (whole UTC days); rejects impossible dates like Feb 30."""
+        if not isinstance(value, str) or not self.DATE_RE.match(value):
+            raise PolicyError(f"{where}: must be a UTC date YYYY-MM-DD: {value!r}")
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            raise PolicyError(f"{where}: impossible or malformed date: {value!r}") from None
+
+    @staticmethod
+    def _decimal_places_ok(value):
+        return isinstance(value, (int, float)) and abs(value * 1000 - round(value * 1000)) < 1e-9
+
+    def _check_decimals(self, node, where, errs):
+        """Credit amounts have at most 3 decimal places (clients use integer millicredits)."""
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ("percent", "tolerance_percent", "reference_megapixels", "step"):
+                    continue  # not credit amounts
+                self._check_decimals(value, f"{where}.{key}", errs)
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                self._check_decimals(value, f"{where}[{i}]", errs)
+        elif isinstance(node, (int, float)) and not isinstance(node, bool) and not self._decimal_places_ok(node):
+            errs.append(f"{where}: more than 3 decimal places: {node!r}")
+
+    def _check_scope(self, obj, where, errs):
+        client = ((obj or {}).get("applies_to") or {}).get("client") or {}
+        try:
+            if "min" in client and "max" in client and self._semver(client["min"]) > self._semver(client["max"]):
+                errs.append(f"{where}.applies_to.client: min is greater than max")
+        except (AttributeError, TypeError):
+            pass  # reported by the schema check
+
+    def credit_errors(self, p):
+        errs = []
+        if "effective_from" in p:
+            self._collect(errs, lambda: self.parse_date(p["effective_from"], "effective_from"))
+        self._check_scope(p, "<payload>", errs)
+        for name in self.CREDIT_SECTIONS:
+            if name in p:
+                self._check_decimals(p[name], name, errs)
+        for name in ("rate_card", "wallets", "ocr"):
+            if isinstance(p.get(name), dict):
+                self._check_scope(p[name], name, errs)
+
+        caps = p.get("caps") or {}
+        seen = set()
+        for i, promo in enumerate(p.get("promotions") or []):
+            where = f"promotions[{i}]"
+            if promo["id"] in seen:
+                errs.append(f"{where}: duplicate promotion id {promo['id']!r}")
+            seen.add(promo["id"])
+            window = {}
+            for field in ("start_date", "end_date"):
+                try:
+                    window[field] = self.parse_date(promo[field], f"{where}.{field}")
+                except PolicyError as e:
+                    errs.append(str(e))
+            if len(window) == 2 and window["start_date"] > window["end_date"]:
+                errs.append(
+                    f"{where}: start_date must not be after end_date ({promo['start_date']} > {promo['end_date']})"
+                )
+            self._check_scope(promo, where, errs)
+            limit = caps.get("promotion_uplift_percent")
+            for wallet, uplift in promo["uplift"].items():
+                self._check_decimals(uplift.get("absolute"), f"{where}.uplift.{wallet}.absolute", errs)
+                if limit is not None and uplift.get("percent", 0) > limit:
+                    errs.append(
+                        f"{where}.uplift.{wallet}: percent {uplift['percent']} exceeds "
+                        f"caps.promotion_uplift_percent {limit}"
+                    )
+
+        bonus = (p.get("metrics") or {}).get("bonus_percent")
+        bonus_cap = caps.get("metrics_bonus_percent", self.DEFAULT_METRICS_BONUS_CAP)
+        if bonus is not None and bonus > bonus_cap:
+            errs.append(f"metrics.bonus_percent {bonus} exceeds the metrics bonus cap {bonus_cap}")
         return errs
 
     # ---- public checks ---------------------------------------------------

@@ -7,6 +7,10 @@ schema major (`/v1/`) and their `sequence` number, not by release tags.
 ## [Unreleased]
 
 ### Added
+- Policy schema v1 credits sections (additive): `rate_card` (with `model_multiplier`), `wallets` (GitHub
+  `daily_private` / `daily_public`, starter, add-on sub-wallets), `promotions`, `caps`, `grace_percent`,
+  `grace_mode`, `metrics`, `ocr.profiles`, the `effective_from` rule (next UTC day boundary) and optional
+  `applies_to` client-version scoping; validator checks and examples (`docs/schema-v1.md`).
 - Hosting and mirror procedure: ordered client URL list, how to move hosts without a client release
   (`docs/hosting-and-mirrors.md`).
 - Branch protection ruleset for `main` (`.github/rulesets/protect-main.json`) and its documentation

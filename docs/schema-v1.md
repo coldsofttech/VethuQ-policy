@@ -63,12 +63,106 @@ Example: `"github_tier": { "enabled": false, "min_client": "1.0.0" }`.
 
 ### `limits` (optional)
 
-Time-boxed limit adjustments and promotions. **Structure only; policies issued in the initial v1
+Generic time-boxed limit adjustments. Credit promotions use the `promotions` section below instead. **Structure only; policies issued in the initial v1
 rollout leave it empty or omit it.** Item (all required except `min_client`):
 `id`, `kind` (`limit_adjustment` | `promotion`), `starts_at`, `ends_at`, `min_client?`,
 `adjustments` (object of name to number/boolean/string). Applies only while now is inside
 `[starts_at, ends_at]`. Which adjustment names exist is defined by the client when it implements them;
 unknown names are ignored.
+
+## Credits sections (additive, optional)
+
+These sections deliver the credit rates, limits and promotions by signed policy so they can change
+without a client release (#198, #199). All are optional and additive within v1; a client that does
+not understand a field ignores it. **The package keeps a baseline** for every value: it is used
+until a policy is available, and for any value the policy leaves out.
+
+Credit amounts are non-negative numbers with **at most 3 decimal places** (clients convert to
+integer millicredits).
+
+### When changes take effect
+
+- Rates are the **same for every client version** unless a section carries an explicit `applies_to`.
+- A new rate card or limit change takes effect at the **next UTC day boundary** after the client
+  first sees it. The day in progress keeps the rates it started with.
+- Optional top-level `effective_from` (a UTC date `YYYY-MM-DD`) delays that: sections `rate_card`,
+  `wallets`, `caps`, `grace_percent`, `grace_mode`, `metrics` and `ocr` take effect at the **later**
+  of `effective_from` and that next boundary. It never makes a change apply earlier.
+- Promotions are not delayed by `effective_from`; they follow their own whole-day windows.
+- Reservation estimates and settlement within one day use the same rate card.
+
+### `applies_to` (optional, on the payload and on sections)
+
+`applies_to.client` is an inclusive client-version range, `{ "min"?: semver, "max"?: semver }`.
+Absent means all versions. A section's own `applies_to` replaces the payload-level one for that
+section. `min` must not exceed `max`. On `promotions`, `applies_to.tiers` and `applies_to.addons`
+filter who gets the promotion; they are ignored elsewhere.
+
+### `rate_card`
+
+`version` (integer >= 1, required) is stamped on every ledger row and increases with every change.
+All other members are optional and fall back to the baseline.
+
+| Member | Meaning |
+|---|---|
+| `page_size` | `tolerance_percent`, `step`, `minimum`, `per_page_max`: credits = page area / A4 area, rounded up to `step` after the tolerance, at least `minimum`; pages above `per_page_max` are refused |
+| `pixels` | `reference_megapixels`, `step`, `minimum`: credits for images = processed pixels / reference |
+| `phases` | `quick`, `moderate`, `high`: credits per A4 page added by each OCR phase |
+| `rotated_factor` | Multiplier per rotated angle pass (a pricing discount) |
+| `language_pass` | Credits per page per extra language |
+| `semantic` | Credits per page for semantic embedding (from its own sub-wallet) |
+| `device_multiplier` | `cpu`, `gpu`: multiplier by the device actually used |
+| `model_multiplier` | `fast`, `advanced`: multiplier by OCR model profile |
+
+### `wallets`
+
+| Member | Meaning |
+|---|---|
+| `local` | `daily`, `starter` (one-off per device) |
+| `github` | `daily_private`, `daily_public`, `starter`. The client picks the daily value from the visibility of the runner repo it checks before each job |
+| `addons` | Sub-wallets keyed by add-on id: `local_daily`, `github_daily`, `starter`. Usable only for that add-on's work |
+
+### `promotions`
+
+Array of `{ id, name, start_date, end_date, uplift, applies_to?, min_client?, message? }`.
+
+- `start_date` / `end_date` are UTC dates (inclusive), so a window is always whole UTC days.
+  `start_date` must not be after `end_date`; impossible dates are rejected; `id` must be unique.
+- `uplift` maps a wallet key (`local`, `github`, `addon:<id>`) to **exactly one** of
+  `{ "absolute": credits }` or `{ "percent": n }`. It is added to that wallet's daily allowance on
+  each day inside the window and ends with the window.
+- Non-stacking: the highest uplift per wallet applies, capped by `caps`.
+- `min_client` and `applies_to.client` both limit the client versions; both must be satisfied.
+
+### `caps`
+
+`promotion_uplift_percent`, `one_off_max`, `one_off_expiry_days`, `device_daily_ceiling`,
+`metrics_bonus_percent` (default 15). Validation rejects a promotion percent above
+`promotion_uplift_percent` and a `metrics.bonus_percent` above the metrics cap.
+
+### `grace_percent`, `grace_mode`
+
+Grace is a percentage (default 2) of a wallet's daily allowance, used only after all other credits
+are exhausted. `grace_mode` is `free` (default) or `borrow` (the used grace is deducted from the
+next day). An unknown mode is ignored and the default used.
+
+### `metrics`
+
+`enabled`, `endpoint` (https), `max_batch_bytes`, `bonus_percent` (default 10, capped by
+`caps.metrics_bonus_percent`). The bonus applies to the daily credits of the local and GitHub
+wallets only while sharing is on and the last send was within 7 days. (The field is
+`metrics.bonus_percent`; earlier discussion called it `metrics_bonus_percent`.)
+
+### `ocr`
+
+`profiles` overrides the model profile per phase (`quick`, `moderate`, `high` to `fast` or
+`advanced`), for example to force `fast` everywhere as a kill switch for the advanced models.
+Absent phases use the client's default.
+
+### Not defined yet
+
+Pack definitions and scoped one-off amounts (#221) may become policy-tunable; they are not part of
+the schema yet and will arrive as a further additive section.
 
 ### `revocations` (reserved)
 

@@ -188,3 +188,214 @@ class TestCli:
     def test_repo_policy_json_passes(self):
         args = ["envelope", str(ROOT / "v1/policy.json"), "--keys-dir", str(ROOT / "keys")]
         assert vp.main(args) == 0
+
+
+def rate_payload(**sections):
+    """A valid payload with the credits sections from the rate-card example, then overrides."""
+    p = make_payload()
+    p.update(json.loads((ROOT / "examples/v1/with-rate-card.payload.json").read_text()))
+    p["kid"] = KID
+    p.update(sections)
+    return p
+
+
+class TestCreditsSections(ValidatorTestCase):
+    """rate_card, wallets, promotions, caps, grace, metrics, ocr, effective_from, applies_to."""
+
+    def errors(self, signer, validator, **sections):
+        return self.envelope_errors(validator, signer.sign(rate_payload(**sections)))
+
+    def test_full_example_is_valid_and_signed_ok(self, signer, validator):
+        assert self.errors(signer, validator) == []
+
+    def test_older_payload_without_credits_sections_still_valid(self, signer, validator):
+        assert self.envelope_errors(validator, signer.sign(make_payload())) == []
+
+    def test_unknown_fields_inside_new_sections_ignored(self, signer, validator):
+        rc = dict(rate_payload()["rate_card"], future_rate=2.5)
+        wallets = dict(rate_payload()["wallets"], future_wallet={"daily": 1})
+        assert self.errors(signer, validator, rate_card=rc, wallets=wallets) == []
+
+    # ---- effective_from -----------------------------------------------------------------
+
+    @pytest.mark.parametrize("value", ["2026-02-30", "2026-13-01", "2026-10-09T00:00:00Z", "20261009", "tomorrow"])
+    def test_effective_from_must_be_a_real_utc_date(self, signer, validator, value):
+        assert self.errors(signer, validator, effective_from=value)
+
+    def test_effective_from_optional(self, signer, validator):
+        p = rate_payload()
+        del p["effective_from"]
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    # ---- applies_to ---------------------------------------------------------------------
+
+    def test_absent_applies_to_means_all_versions(self, signer, validator):
+        p = rate_payload()
+        assert "applies_to" not in p["rate_card"]
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    def test_client_range_must_be_ordered(self, signer, validator):
+        rc = dict(rate_payload()["rate_card"], applies_to={"client": {"min": "2.0.0", "max": "1.0.0"}})
+        assert any("min is greater than max" in e for e in self.errors(signer, validator, rate_card=rc))
+
+    def test_payload_level_applies_to_checked(self, signer, validator):
+        errs = self.errors(signer, validator, applies_to={"client": {"min": "2.0.0", "max": "1.0.0"}})
+        assert any("<payload>.applies_to" in e for e in errs)
+
+    def test_open_ended_client_range_ok(self, signer, validator):
+        rc = dict(rate_payload()["rate_card"], applies_to={"client": {"min": "1.2.0"}})
+        assert self.errors(signer, validator, rate_card=rc) == []
+
+    def test_bad_semver_in_applies_to(self, signer, validator):
+        rc = dict(rate_payload()["rate_card"], applies_to={"client": {"min": "one"}})
+        assert self.errors(signer, validator, rate_card=rc)
+
+    # ---- rate card ----------------------------------------------------------------------
+
+    def test_rate_card_requires_a_version(self, signer, validator):
+        rc = rate_payload()["rate_card"]
+        del rc["version"]
+        assert self.errors(signer, validator, rate_card=rc)
+
+    @pytest.mark.parametrize("version", [0, -1, 1.5, "3"])
+    def test_rate_card_version_must_be_a_positive_integer(self, signer, validator, version):
+        rc = dict(rate_payload()["rate_card"], version=version)
+        assert self.errors(signer, validator, rate_card=rc)
+
+    @pytest.mark.parametrize(
+        "path,value",
+        [
+            (("phases", "quick"), -1),
+            (("rotated_factor",), -0.1),
+            (("semantic",), -0.5),
+            (("device_multiplier", "gpu"), -1),
+            (("model_multiplier", "advanced"), "high"),
+            (("page_size", "per_page_max"), 0),
+            (("pixels", "reference_megapixels"), 0),
+        ],
+    )
+    def test_invalid_rates(self, signer, validator, path, value):
+        rc = rate_payload()["rate_card"]
+        node = rc
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] = value
+        assert self.errors(signer, validator, rate_card=rc)
+
+    def test_more_than_three_decimal_places_rejected(self, signer, validator):
+        rc = rate_payload()["rate_card"]
+        rc["phases"]["moderate"] = 2.4001
+        assert any("3 decimal places" in e for e in self.errors(signer, validator, rate_card=rc))
+
+    def test_three_decimal_places_accepted(self, signer, validator):
+        rc = rate_payload()["rate_card"]
+        rc["phases"]["moderate"] = 2.401
+        assert self.errors(signer, validator, rate_card=rc) == []
+
+    # ---- wallets ------------------------------------------------------------------------
+
+    def test_github_daily_split_by_visibility(self, signer, validator):
+        wallets = rate_payload()["wallets"]
+        assert wallets["github"] == {"daily_private": 20, "daily_public": 200}
+        assert self.errors(signer, validator) == []
+
+    @pytest.mark.parametrize(
+        "wallets", [{"local": {"daily": -1}}, {"github": {"daily_public": "many"}}, {"addons": {"Semantic": {}}}]
+    )
+    def test_invalid_wallets(self, signer, validator, wallets):
+        assert self.errors(signer, validator, wallets=wallets)
+
+    # ---- promotions ---------------------------------------------------------------------
+
+    def promo(self, **over):
+        base = rate_payload()["promotions"][0]
+        base.update(over)
+        return base
+
+    def test_promotion_window_is_inclusive_whole_days(self, signer, validator):
+        one_day = self.promo(start_date="2026-11-01", end_date="2026-11-01")
+        assert self.errors(signer, validator, promotions=[one_day]) == []
+
+    @pytest.mark.parametrize(
+        "over,message",
+        [
+            ({"start_date": "2026-11-08", "end_date": "2026-11-07"}, "must not be after"),
+            ({"start_date": "2026-02-30"}, "impossible"),
+            ({"end_date": "2026-11-07T00:00:00Z"}, "UTC date"),
+        ],
+    )
+    def test_invalid_promotion_windows(self, signer, validator, over, message):
+        errs = self.errors(signer, validator, promotions=[self.promo(**over)])
+        assert any(message in e or "schema" in e for e in errs), errs
+
+    def test_duplicate_promotion_ids_rejected(self, signer, validator):
+        errs = self.errors(signer, validator, promotions=[self.promo(), self.promo()])
+        assert any("duplicate promotion id" in e for e in errs)
+
+    def test_uplift_needs_exactly_one_of_absolute_or_percent(self, signer, validator):
+        for uplift in ({"local": {}}, {"local": {"absolute": 5, "percent": 10}}, {}):
+            assert self.errors(signer, validator, promotions=[self.promo(uplift=uplift)]), uplift
+
+    def test_uplift_wallet_keys_checked(self, signer, validator):
+        ok = {"addon:semantic": {"absolute": 5}}
+        assert self.errors(signer, validator, promotions=[self.promo(uplift=ok)]) == []
+        assert self.errors(signer, validator, promotions=[self.promo(uplift={"cloud": {"absolute": 5}})])
+
+    def test_percent_uplift_cannot_exceed_the_cap(self, signer, validator):
+        caps = {"promotion_uplift_percent": 40}
+        errs = self.errors(signer, validator, caps=caps)
+        assert any("exceeds caps.promotion_uplift_percent" in e for e in errs)
+
+    def test_promotion_scope_filters_accepted(self, signer, validator):
+        scoped = self.promo(
+            applies_to={"tiers": ["pro"], "addons": ["semantic"], "client": {"min": "1.1.0"}}, min_client="1.1.0"
+        )
+        assert self.errors(signer, validator, promotions=[scoped]) == []
+
+    # ---- grace, caps, metrics, ocr ------------------------------------------------------
+
+    @pytest.mark.parametrize("over", [{"grace_mode": "overdraft"}, {"grace_percent": -1}, {"grace_percent": 101}])
+    def test_invalid_grace(self, signer, validator, over):
+        assert self.errors(signer, validator, **over)
+
+    @pytest.mark.parametrize("mode", ["free", "borrow"])
+    def test_grace_modes(self, signer, validator, mode):
+        assert self.errors(signer, validator, grace_mode=mode) == []
+
+    def test_metrics_bonus_defaults_to_a_cap_of_15(self, signer, validator):
+        p = rate_payload()
+        del p["caps"]["metrics_bonus_percent"]
+        p["metrics"]["bonus_percent"] = 16
+        errs = self.envelope_errors(validator, signer.sign(p))
+        assert any("exceeds the metrics bonus cap 15" in e for e in errs)
+
+    def test_metrics_bonus_follows_the_policy_cap(self, signer, validator):
+        p = rate_payload()
+        p["caps"]["metrics_bonus_percent"] = 20
+        p["metrics"]["bonus_percent"] = 18
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    def test_metrics_endpoint_must_be_https(self, signer, validator):
+        metrics = dict(rate_payload()["metrics"], endpoint="http://example.com/m")
+        assert self.errors(signer, validator, metrics=metrics)
+
+    def test_ocr_profile_override_values(self, signer, validator):
+        assert self.errors(signer, validator, ocr={"profiles": {"quick": "fast", "high": "fast"}}) == []
+        assert self.errors(signer, validator, ocr={"profiles": {"quick": "ultra"}})
+
+    def test_caps_values(self, signer, validator):
+        assert self.errors(signer, validator, caps={"one_off_expiry_days": 0})
+        assert self.errors(signer, validator, caps={"device_daily_ceiling": -5})
+
+
+class TestRateCardExamples:
+    validator = vp.PolicyValidator()
+
+    @pytest.mark.parametrize("name", ["with-rate-card", "rate-card-scoped"])
+    def test_examples_pass(self, name):
+        payload = json.loads((ROOT / f"examples/v1/{name}.payload.json").read_text())
+        assert self.validator.validate_payload(payload) == []
+
+    def test_scoped_example_is_explicit_about_scope(self):
+        payload = json.loads((ROOT / "examples/v1/rate-card-scoped.payload.json").read_text())
+        assert payload["rate_card"]["applies_to"]["client"]["min"] == "1.2.0"
