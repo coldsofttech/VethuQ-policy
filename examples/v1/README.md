@@ -11,4 +11,5 @@ policy; the live signed envelope is `/v1/policy.json`. All URLs, hashes and the 
 | `with-promotion-window.payload.json` | Downloads, add-on API range and a time-boxed promotion |
 | `with-rate-card.payload.json` | The credits sections: rate card, wallets (GitHub private/public daily), a promotion, caps, grace, metrics, OCR profiles and `effective_from` |
 | `rate-card-scoped.payload.json` | A rate card limited to clients >= 1.2.0 with an advanced-model multiplier, and an OCR profile override forcing `fast` |
+| `with-key-revocation.payload.json` | A policy signed by a standby key that revokes a compromised policy key id and a licence key id, with a critical notice and a raised `minimum_supported` |
 | `envelope.example.json` | Envelope wrapping the minimal payload (placeholder signature, does not verify) |

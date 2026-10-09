@@ -172,6 +172,39 @@ Absent phases use the client's default.
 Pack definitions (which add-ons a pack contains) and scoped one-off amounts (#221) may become policy-tunable; they are not part of
 the schema yet and will arrive as a further additive section.
 
+### Key revocation (`revoked_key_ids`)
+
+Optional array (max 32, unique) of signing key ids the client must stop trusting. Without it, a
+compromised key stays trusted until the user installs a client or runtime release that drops it.
+Additive within v1: **clients that do not understand the field ignore it** and keep trusting the key
+until they update, so a release that drops the key is still part of the response.
+
+Rules (client behaviour; the schema only carries the list):
+
+1. **Who may revoke.** A revocation is honoured only if the envelope `kid` is in the client's
+   embedded **policy-standby** key set. A policy signed by an active policy key is still valid, but
+   its `revoked_key_ids` is ignored. Reason: if a compromised active key could revoke the standby,
+   the attacker would hold the only trusted key and the owner would have no in-band recovery.
+2. **What may be revoked.** Any key id of any purpose (policy, licence, bundle) **except** the
+   signing key itself and the policy-standby keys. A standby key can only be replaced by a client
+   release. Entries naming those are ignored. The validator rejects a policy that lists its own `kid`.
+3. **Immediate.** Revocation is a security action and applies as soon as the policy is accepted. The
+   next-UTC-day rule and `effective_from` do not apply to it.
+4. **Permanent.** The client persists the revoked set across restarts and updates. It only grows: a
+   later policy that omits an id does not restore it. A key id derives from the key material, so a
+   revoked key never comes back.
+5. **Scope of the refusal.** Anything signed by a revoked key id is refused: policies, licences and
+   bundle manifests. Licences signed by a revoked licence key stop verifying, so affected licences
+   must be re-issued with the replacement key.
+6. **Fails closed for trust, open for work.** If the revoked key was the only trusted signer left,
+   the client keeps the last accepted policy and baseline values and shows a notice, and local work
+   is never blocked.
+7. **Sequence.** A revoking policy is an ordinary policy: its `sequence` must exceed the last
+   accepted one. A forged very high sequence from a compromised key can therefore block it; that
+   hazard is tracked separately (#266).
+
+Example: `examples/v1/with-key-revocation.payload.json`.
+
 ### `revocations` (reserved)
 
 Licence ids to revoke. **Reserved and MUST be empty in v1** (the schema enforces `maxItems: 0`).

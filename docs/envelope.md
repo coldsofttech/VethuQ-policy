@@ -33,10 +33,14 @@ re-serialise JSON (key order, whitespace, number formatting) to verify it.
 ## Verification (client)
 
 1. Parse the envelope; require `alg == "Ed25519"`.
-2. Look up the embedded public key for `kid`; unknown `kid` means reject.
+2. Look up the embedded public key for `kid`; unknown `kid` means reject. Reject too if `kid` is in
+   the persisted revoked set (see [Key revocation](schema-v1.md#key-revocation)).
 3. base64url-decode `payload` and `sig`; verify the signature over the payload bytes. Reject on failure.
 4. **Only after** verification, parse the payload; require `payload.kid == kid` and `schema_version == 1`.
 5. Reject if `sequence` is lower than the last accepted; then apply the policy.
+6. If `kid` is in the client's embedded **policy-standby** set, add `payload.revoked_key_ids` to the
+   persisted revoked set (ignoring any entry that is `kid` itself or a standby key). From then on
+   refuse anything signed by those key ids: policies, licences and bundle manifests.
 
 ## Example
 
