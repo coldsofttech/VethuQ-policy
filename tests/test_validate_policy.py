@@ -399,3 +399,34 @@ class TestRateCardExamples:
     def test_scoped_example_is_explicit_about_scope(self):
         payload = json.loads((ROOT / "examples/v1/rate-card-scoped.payload.json").read_text())
         assert payload["rate_card"]["applies_to"]["client"]["min"] == "1.2.0"
+
+
+class TestKeyRevocation(ValidatorTestCase):
+    """revoked_key_ids: shape and the rules the validator can check (the client enforces the rest)."""
+
+    def errors(self, signer, validator, **sections):
+        return self.envelope_errors(validator, signer.sign(make_payload(**sections)))
+
+    def test_valid_list(self, signer, validator):
+        assert self.errors(signer, validator, revoked_key_ids=["pol-aaaa", "lic-bbbb"]) == []
+
+    def test_absent_and_empty_are_fine(self, signer, validator):
+        assert self.errors(signer, validator) == []
+        assert self.errors(signer, validator, revoked_key_ids=[]) == []
+
+    def test_cannot_revoke_its_own_signing_key(self, signer, validator):
+        errs = self.errors(signer, validator, revoked_key_ids=[KID])
+        assert any("cannot revoke its own signing key" in e for e in errs)
+
+    @pytest.mark.parametrize("value", ["pol-a", [1], ["a b"], ["x"] * 2, [f"k{i}" for i in range(33)], [""]])
+    def test_invalid_shapes(self, signer, validator, value):
+        assert self.errors(signer, validator, revoked_key_ids=value)
+
+    def test_example_passes(self):
+        payload = json.loads((ROOT / "examples/v1/with-key-revocation.payload.json").read_text())
+        assert vp.PolicyValidator().validate_payload(payload) == []
+        assert payload["kid"] not in payload["revoked_key_ids"]
+
+    def test_older_validators_ignore_the_field(self, signer, validator):
+        # Additive: a payload with the field is still an ordinary valid payload.
+        assert self.errors(signer, validator, revoked_key_ids=["pol-aaaa"], future_field=1) == []

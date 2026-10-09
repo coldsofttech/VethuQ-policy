@@ -107,6 +107,13 @@
       "description": "OCR engine settings delivered by policy.",
       "$ref": "#/$defs/ocr"
     },
+    "revoked_key_ids": {
+      "description": "Signing key ids the client must stop trusting, at once and permanently. Honoured only when the envelope was signed by a key in the client's embedded policy-standby set; the signing key itself and standby keys can never be listed. See docs/schema-v1.md, 'Key revocation'.",
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/kid" }
+    },
     "revocations": {
       "description": "Revoked licence ids. Reserved: MUST be empty in v1. Clients ignore it until a later additive change defines its use.",
       "type": "array",

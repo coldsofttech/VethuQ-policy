@@ -139,6 +139,18 @@ class PolicyValidator:
             except (KeyError, AttributeError, TypeError):
                 pass
         errs += self.credit_errors(p)
+        errs += self.revocation_errors(p)
+        return errs
+
+    # ---- key revocation ----------------------------------------------------------
+
+    def revocation_errors(self, p):
+        """revoked_key_ids: a policy may not revoke its own signing key. (Which keys may sign a
+        revocation is a client rule, based on the client's embedded standby set.)"""
+        errs = []
+        revoked = p.get("revoked_key_ids") or []
+        if p.get("kid") in revoked:
+            errs.append(f"revoked_key_ids: a policy cannot revoke its own signing key {p['kid']!r}")
         return errs
 
     # ---- credits sections (rate card, wallets, promotions, caps, metrics) -------

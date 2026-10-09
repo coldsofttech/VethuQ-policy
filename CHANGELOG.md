@@ -7,6 +7,9 @@ schema major (`/v1/`) and their `sequence` number, not by release tags.
 ## [Unreleased]
 
 ### Added
+- Policy schema v1 `revoked_key_ids` (additive): in-band revocation of signing key ids, honoured only from a
+  policy-standby signature, immediate and permanent; envelope verification steps updated
+  (`docs/schema-v1.md`, `docs/envelope.md`).
 - Policy schema v1 credits sections (additive): `rate_card` (with `model_multiplier`), `wallets` (GitHub
   `daily_private` / `daily_public`, starter, add-on sub-wallets), `promotions`, `caps`, `grace_percent`,
   `grace_mode`, `metrics`, `ocr.profiles`, the `effective_from` rule (next UTC day boundary) and optional
