@@ -80,6 +80,14 @@ until a policy is available, and for any value the policy leaves out.
 Credit amounts are non-negative numbers with **at most 3 decimal places** (clients convert to
 integer millicredits).
 
+### Terms: add-ons and packs
+
+An **add-on** is one individual element (Word, Excel, PowerPoint, Email, Lexical, Semantic, ...).
+A **pack** (Office, Web, Telugu, the text pack, ...) is a bundle of add-ons licensed together.
+Everything in this schema that names an add-on (`wallets.addons.<id>`, `promotions[].applies_to.addons`,
+the `addon:<id>` uplift wallet key) uses the **add-on** id, such as `semantic`, never a pack name.
+Packs are not part of the schema yet (see "Not defined yet").
+
 ### When changes take effect
 
 - Rates are the **same for every client version** unless a section carries an explicit `applies_to`.
@@ -161,7 +169,7 @@ Absent phases use the client's default.
 
 ### Not defined yet
 
-Pack definitions and scoped one-off amounts (#221) may become policy-tunable; they are not part of
+Pack definitions (which add-ons a pack contains) and scoped one-off amounts (#221) may become policy-tunable; they are not part of
 the schema yet and will arrive as a further additive section.
 
 ### `revocations` (reserved)
