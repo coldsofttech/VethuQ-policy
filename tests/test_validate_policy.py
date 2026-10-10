@@ -110,6 +110,34 @@ class TestSchema(ValidatorTestCase):
         assert any("minimum_supported" in e for e in errs)
 
 
+class TestUpdateCheck(ValidatorTestCase):
+    """What the client's update check reads: versions, release notes and feature messages."""
+
+    def test_update_example_is_valid(self, signer, validator):
+        payload = json.loads((ROOT / "examples/v1/with-update.payload.json").read_text())
+        payload["kid"] = KID
+        assert self.envelope_errors(validator, signer.sign(payload)) == []
+
+    def test_feature_message_optional(self, signer, validator):
+        p = make_payload(features={"github_tier": {"enabled": True, "min_client": "1.2.0"}})
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    def test_feature_message_accepted(self, signer, validator):
+        p = make_payload(features={"github_tier": {"enabled": True, "min_client": "1.2.0", "message": "x" * 200}})
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    @pytest.mark.parametrize("message", ["x" * 201, 5, None])
+    def test_invalid_feature_message_rejected(self, signer, validator, message):
+        p = make_payload(features={"github_tier": {"enabled": True, "message": message}})
+        assert self.envelope_errors(validator, signer.sign(p))
+
+    @pytest.mark.parametrize("version", ["1.2.0-rc.1", "1.2.0-beta.2", "1.2.0-alpha.1"])
+    def test_prerelease_versions_use_the_shared_form(self, signer, validator, version):
+        p = make_payload()
+        p["versions"]["pip"]["latest"] = version
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+
 class TestSignature(ValidatorTestCase):
     def test_bad_signature(self, signer, validator):
         env = signer.sign(make_payload(), key=Ed25519PrivateKey.generate())
