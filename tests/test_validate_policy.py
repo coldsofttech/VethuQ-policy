@@ -138,6 +138,74 @@ class TestUpdateCheck(ValidatorTestCase):
         assert self.envelope_errors(validator, signer.sign(p)) == []
 
 
+class TestComponents(ValidatorTestCase):
+    """Per-component versions: released on their own, independent of the app-level `versions`."""
+
+    @staticmethod
+    def with_components(**components):
+        return make_payload(components=components)
+
+    def test_example_is_valid(self, signer, validator):
+        payload = json.loads((ROOT / "examples/v1/with-components.payload.json").read_text())
+        payload["kid"] = KID
+        assert self.envelope_errors(validator, signer.sign(payload)) == []
+
+    def test_optional(self, signer, validator):
+        assert self.envelope_errors(validator, signer.sign(make_payload())) == []
+
+    def test_minimal_entry(self, signer, validator):
+        p = self.with_components(**{"vethuq-ui": {"latest": "1.3.1", "minimum_supported": "1.2.0"}})
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    @pytest.mark.parametrize("name", ["vethuq-addon-tolerant", "a", "vethuq-addon-lang-te", "x1-y2"])
+    def test_distribution_names_accepted(self, signer, validator, name):
+        p = self.with_components(**{name: {"latest": "1.0.0", "minimum_supported": "1.0.0"}})
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    @pytest.mark.parametrize("name", ["Vethuq-ui", "vethuq_ui", "-ui", "ui-", "vethuq--ui", "1ui", "a" * 65, ""])
+    def test_bad_distribution_names_rejected(self, signer, validator, name):
+        p = self.with_components(**{name: {"latest": "1.0.0", "minimum_supported": "1.0.0"}})
+        assert self.envelope_errors(validator, signer.sign(p))
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            {"latest": "1.0.0"},
+            {"minimum_supported": "1.0.0"},
+            {"latest": "1.0", "minimum_supported": "1.0.0"},
+            {"latest": "1.0.0", "minimum_supported": "1.0.0", "release_notes_url": "http://example.com"},
+            {"latest": "1.0.0", "minimum_supported": "1.0.0", "distributions": []},
+            {"latest": "1.0.0", "minimum_supported": "1.0.0", "distributions": ["mac"]},
+            {"latest": "1.0.0", "minimum_supported": "1.0.0", "distributions": ["pip", "pip"]},
+            "1.0.0",
+        ],
+    )
+    def test_invalid_entries_rejected(self, signer, validator, entry):
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-ui": entry})))
+
+    @pytest.mark.parametrize("distributions", [["desktop"], ["pip"], ["desktop", "pip"]])
+    def test_distributions_limit_accepted(self, signer, validator, distributions):
+        entry = {"latest": "1.0.0", "minimum_supported": "1.0.0", "distributions": distributions}
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-ui": entry}))) == []
+
+    def test_minimum_supported_not_above_latest(self, signer, validator):
+        p = self.with_components(**{"vethuq-ui": {"latest": "1.0.0", "minimum_supported": "1.1.0"}})
+        errs = self.envelope_errors(validator, signer.sign(p))
+        assert any("components.vethuq-ui" in e and "minimum_supported" in e for e in errs)
+
+    def test_a_component_does_not_constrain_the_app_versions(self, signer, validator):
+        p = make_payload(components={"vethuq-ui": {"latest": "9.0.0", "minimum_supported": "9.0.0"}})
+        assert self.envelope_errors(validator, signer.sign(p)) == []
+
+    def test_unknown_fields_in_an_entry_ignored(self, signer, validator):
+        entry = {"latest": "1.0.0", "minimum_supported": "1.0.0", "future": True}
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-ui": entry}))) == []
+
+    def test_entry_count_is_capped(self, signer, validator):
+        many = {f"c{i}": {"latest": "1.0.0", "minimum_supported": "1.0.0"} for i in range(129)}
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**many)))
+
+
 class TestSignature(ValidatorTestCase):
     def test_bad_signature(self, signer, validator):
         env = signer.sign(make_payload(), key=Ed25519PrivateKey.generate())

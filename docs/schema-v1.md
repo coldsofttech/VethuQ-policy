@@ -57,6 +57,37 @@ their distribution (`pip` for the PyPI package, `desktop` for the installer). Ru
 Download entry (all required): `platform` (e.g. `windows-x64`, `macos-arm64`, `linux-x64`),
 `url` (https), `size` (bytes), `sha256` (lowercase hex). Clients MUST verify `sha256`.
 
+### `components` (optional)
+
+Components are released on their own: a fix in the UI, the CLI, the core or one add-on does not
+need a new app version, so `versions` (the whole app, as installed by the desktop installer or
+`pip install vethuq`) is not enough. `components` is an object keyed by **Python distribution
+name**: `vethuq-core`, `vethuq-cli`, `vethuq-ui` and `vethuq-addon-<name>` (one entry per add-on
+wheel). Names match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (max 64 characters, at most 128 entries).
+Packs and bundles group add-ons for licensing and have no version of their own.
+
+| Field | Type | Description |
+|---|---|---|
+| `latest` | semver | Newest released version of the component. |
+| `minimum_supported` | semver | Installed copies older than this must update. |
+| `release_notes_url` | https URL, optional | Release notes for `latest`. |
+| `distributions` | array of `desktop` / `pip`, optional | Limit the entry to one distribution. Absent means both. |
+
+Rules (client behaviour):
+
+- **Only installed components count.** A client compares the components it actually has and
+  ignores every other entry, so an add-on the user did not install is never announced here.
+- **Same meaning as `versions`:** versions are written `x.y.z` (pre-release only as `-alpha.N`,
+  `-beta.N`, `-rc.N`); `latest` newer than installed is a notice, never a block; below
+  `minimum_supported`, local features keep working and only what depends on that component is held
+  back; a value a client cannot parse means "no information".
+- **No effect on the app-level entries.** Releasing a component changes `components` only.
+- **Policy is the only source,** as for `versions`. Whether premium add-on versions are published
+  here or in the signed premium catalog is tracked in coldsofttech/VethuQ-support#277.
+- Unknown component names and unknown fields are ignored (rule 2 above).
+
+Example: `examples/v1/with-components.payload.json`.
+
 ### `compatibility` (optional)
 
 `addon_api.min` / `addon_api.max`: inclusive semver range of the add-on API supported by `latest`.
