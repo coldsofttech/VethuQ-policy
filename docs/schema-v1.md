@@ -71,6 +71,7 @@ Packs and bundles group add-ons for licensing and have no version of their own.
 | `latest` | semver | Newest released version of the component. |
 | `minimum_supported` | semver | Installed copies older than this must update. |
 | `release_notes_url` | https URL, optional | Release notes for `latest`. |
+| `premium` | boolean, optional | The component needs a licence (a premium add-on). Default `false`. |
 | `distributions` | array of `desktop` / `pip`, optional | Limit the entry to one distribution. Absent means both. |
 
 Rules (client behaviour):
@@ -81,6 +82,10 @@ Rules (client behaviour):
   `-beta.N`, `-rc.N`); `latest` newer than installed is a notice, never a block; below
   `minimum_supported`, local features keep working and only what depends on that component is held
   back; a value a client cannot parse means "no information".
+- **`premium`** only says the component is licensed. The version rules above are unchanged; the
+  client still compares only what is installed, and installing or updating a premium component goes
+  through the licence check (coldsofttech/VethuQ-support#134). It is not a way to grant or deny
+  access: entitlements come from the licence, never from this flag.
 - **No effect on the app-level entries.** Releasing a component changes `components` only.
 - **Policy is the only source,** as for `versions`. Whether premium add-on versions are published
   here or in the signed premium catalog is tracked in coldsofttech/VethuQ-support#277.

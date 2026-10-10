@@ -188,6 +188,16 @@ class TestComponents(ValidatorTestCase):
         entry = {"latest": "1.0.0", "minimum_supported": "1.0.0", "distributions": distributions}
         assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-ui": entry}))) == []
 
+    @pytest.mark.parametrize("premium", [True, False])
+    def test_premium_flag_accepted(self, signer, validator, premium):
+        entry = {"latest": "1.0.0", "minimum_supported": "1.0.0", "premium": premium}
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-addon-x": entry}))) == []
+
+    @pytest.mark.parametrize("premium", ["yes", 1, None, "true"])
+    def test_premium_flag_must_be_a_boolean(self, signer, validator, premium):
+        entry = {"latest": "1.0.0", "minimum_supported": "1.0.0", "premium": premium}
+        assert self.envelope_errors(validator, signer.sign(self.with_components(**{"vethuq-addon-x": entry})))
+
     def test_minimum_supported_not_above_latest(self, signer, validator):
         p = self.with_components(**{"vethuq-ui": {"latest": "1.0.0", "minimum_supported": "1.1.0"}})
         errs = self.envelope_errors(validator, signer.sign(p))

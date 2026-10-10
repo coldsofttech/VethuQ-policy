@@ -8,7 +8,7 @@ policy; the live signed envelope is `/v1/policy.json`. All URLs, hashes and the 
 | `minimal.payload.json` | Smallest valid payload |
 | `with-notice.payload.json` | A notice with a time window and link |
 | `feature-disabled.payload.json` | A feature flag disabled (kill switch) |
-| `with-components.payload.json` | Separately released components (core, cli, ui, an add-on) with their own `latest` / `minimum_supported`, one limited to the desktop installer |
+| `with-components.payload.json` | Separately released components (core, cli, ui, an add-on) with their own `latest` / `minimum_supported`, one limited to the desktop installer and one marked `premium` |
 | `with-update.payload.json` | A newer `latest` than `minimum_supported`, release notes, and a feature that needs a newer client with its own `message` |
 | `with-promotion-window.payload.json` | Downloads, add-on API range and a time-boxed promotion |
 | `with-rate-card.payload.json` | The credits sections: rate card, wallets (GitHub private/public daily), a promotion, caps, grace, metrics, OCR profiles and `effective_from` |

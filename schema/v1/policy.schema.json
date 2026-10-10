@@ -169,6 +169,10 @@
           "$ref": "#/$defs/semver"
         },
         "release_notes_url": { "$ref": "#/$defs/url" },
+        "premium": {
+          "description": "The component needs a licence (a premium add-on). Defaults to false. Installing or updating it goes through the licence check; the version rules are the same as for any component.",
+          "type": "boolean"
+        },
         "distributions": {
           "description": "Limit the entry to the desktop installer or the pip package. Absent means both.",
           "type": "array",
