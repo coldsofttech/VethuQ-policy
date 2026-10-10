@@ -25,7 +25,7 @@ Required: `schema_version`, `sequence`, `issued_at`, `kid`, `versions`.
 | Field | Type | Description |
 |---|---|---|
 | `schema_version` | integer, const `1` | Schema major. |
-| `sequence` | integer >= 1 | Monotonic. Clients reject a sequence lower than the last accepted one (rollback protection). |
+| `sequence` | integer >= 1 | Monotonic. Clients reject a sequence that is not greater than the floor for the signing key (rollback protection; per-key rules in [envelope.md](envelope.md#rollback-protection-and-forged-sequences)). |
 | `issued_at` | date-time (UTC) | When the policy was signed. |
 | `kid` | string | Signing key id. Must equal the envelope `kid`; clients reject a mismatch. |
 
@@ -199,9 +199,10 @@ Rules (client behaviour; the schema only carries the list):
 6. **Fails closed for trust, open for work.** If the revoked key was the only trusted signer left,
    the client keeps the last accepted policy and baseline values and shows a notice, and local work
    is never blocked.
-7. **Sequence.** A revoking policy is an ordinary policy: its `sequence` must exceed the last
-   accepted one. A forged very high sequence from a compromised key can therefore block it; that
-   hazard is tracked separately (#266).
+7. **Sequence.** A revoking policy is an ordinary policy, but it is signed by a standby key, whose
+   floor is that key's own last sequence. A forged very high sequence from a compromised key
+   therefore cannot block it, and once the revocation is accepted the forged number stops
+   counting ([envelope.md](envelope.md#rollback-protection-and-forged-sequences), #266).
 
 Example: `examples/v1/with-key-revocation.payload.json`.
 
