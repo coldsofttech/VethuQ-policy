@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "sequence": 4,
+  "issued_at": "2026-10-08T12:00:00Z",
+  "kid": "example-1",
+  "versions": {
+    "desktop": {
+      "latest": "1.2.0",
+      "minimum_supported": "1.0.0",
+      "release_notes_url": "https://example.com/releases/1.2.0"
+    },
+    "pip": {
+      "latest": "1.2.0",
+      "minimum_supported": "1.0.0",
+      "release_notes_url": "https://example.com/releases/1.2.0"
+    }
+  },
+  "features": {
+    "github_tier": {
+      "enabled": true,
+      "min_client": "1.2.0",
+      "message": "The GitHub tier needs VethuQ 1.2.0 or newer. Update to use it; local indexing and search keep working."
+    }
+  }
+}

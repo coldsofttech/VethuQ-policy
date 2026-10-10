@@ -40,6 +40,20 @@ Keys `desktop` and `pip`, each a distribution object:
 | `release_notes_url` | https URL, optional | Release notes for `latest`. |
 | `downloads` | array, optional | Per-platform entries (normally desktop only). |
 
+**Update check.** Clients compare their own version with `latest` and `minimum_supported` for
+their distribution (`pip` for the PyPI package, `desktop` for the installer). Rules:
+
+- Write versions as `x.y.z`. A pre-release may use only `-alpha.N`, `-beta.N` or `-rc.N`, a form
+  that both semver and PEP 440 (the pip package's scheme) order the same way. Clients treat a value
+  they cannot parse as "no information" and show nothing.
+- `latest` newer than the client means "an update is available". It is a notice, never a block.
+- A client below `minimum_supported` is told it must update, but **local features keep working**.
+  Only features that depend on a newer client are held back (see `features`), each with a clear
+  message. `minimum_supported` never disables local indexing, search or the data the user already has.
+- The policy is the only source: clients do not fall back to PyPI or GitHub Releases. If no policy
+  is available (offline, or not fetched yet), the client shows nothing.
+- Publish a new `latest` only after the release is actually downloadable.
+
 Download entry (all required): `platform` (e.g. `windows-x64`, `macos-arm64`, `linux-x64`),
 `url` (https), `size` (bytes), `sha256` (lowercase hex). Clients MUST verify `sha256`.
 
@@ -59,7 +73,10 @@ A notice is shown only inside its optional time window (open-ended when a bound 
 Object keyed by flag name (`^[a-z][a-z0-9_]*$`), each `{ enabled, min_client? }`.
 `min_client` limits the flag to clients at or above that version. `enabled: false` is also the
 remote kill switch. An absent flag means the client's built-in default applies.
-Example: `"github_tier": { "enabled": false, "min_client": "1.0.0" }`.
+Optional `message` (plain text, max 200 characters) is shown to the user when the feature is
+unavailable to their client, for example because it is below `min_client`; without it the client
+writes its own generic message from `min_client`.
+Examples: `"github_tier": { "enabled": false, "min_client": "1.0.0" }`, and `examples/v1/with-update.payload.json`.
 
 ### `limits` (optional)
 

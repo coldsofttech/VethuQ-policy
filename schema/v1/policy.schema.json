@@ -186,6 +186,11 @@
         "min_client": {
           "description": "The flag applies only to clients at or above this version.",
           "$ref": "#/$defs/semver"
+        },
+        "message": {
+          "description": "Optional plain-text explanation shown when the feature is unavailable to a client, for example because it is below min_client. Never rendered as HTML.",
+          "type": "string",
+          "maxLength": 200
         }
       }
     },

@@ -7,6 +7,9 @@ schema major (`/v1/`) and their `sequence` number, not by release tags.
 ## [Unreleased]
 
 ### Added
+- Update check (#97): `features.<name>.message` (additive, optional) so a feature held back for an older client
+  can carry its own explanation; documented the client rules for `latest` / `minimum_supported` (policy is the only
+  source, pre-release form, local features never blocked); example `with-update.payload.json`.
 - Rollback protection rules (`docs/envelope.md`): the client records the highest sequence per signing key
   id and derives the floor from keys that are still trusted and not revoked; standby keys use their own
   counter. A forged high sequence from a compromised key can no longer block legitimate policies (#266).
