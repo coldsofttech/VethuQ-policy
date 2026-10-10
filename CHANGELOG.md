@@ -7,6 +7,9 @@ schema major (`/v1/`) and their `sequence` number, not by release tags.
 ## [Unreleased]
 
 ### Added
+- Rollback protection rules (`docs/envelope.md`): the client records the highest sequence per signing key
+  id and derives the floor from keys that are still trusted and not revoked; standby keys use their own
+  counter. A forged high sequence from a compromised key can no longer block legitimate policies (#266).
 - Policy schema v1 `revoked_key_ids` (additive): in-band revocation of signing key ids, honoured only from a
   policy-standby signature, immediate and permanent; envelope verification steps updated
   (`docs/schema-v1.md`, `docs/envelope.md`).
