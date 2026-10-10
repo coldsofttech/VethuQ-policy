@@ -48,6 +48,13 @@
         }
       }
     },
+    "components": {
+      "description": "Latest and minimum supported version of each separately released component, keyed by its Python distribution name (for example vethuq-core, vethuq-cli, vethuq-ui or vethuq-addon-<name>). Releasing one component does not change the app-level versions entry. Clients look only at the components they have installed and ignore the rest.",
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$", "maxLength": 64 },
+      "additionalProperties": { "$ref": "#/$defs/component" }
+    },
     "notices": {
       "description": "User-facing notices. A notice is shown only inside its optional starts_at/ends_at window.",
       "type": "array",
@@ -149,6 +156,29 @@
           "description": "Per-platform download entries. Used by the desktop distribution; pip normally omits it.",
           "type": "array",
           "items": { "$ref": "#/$defs/download" }
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["latest", "minimum_supported"],
+      "properties": {
+        "latest": { "$ref": "#/$defs/semver" },
+        "minimum_supported": {
+          "description": "Installed copies older than this are told they must update; what depends on this component is held back, local work is not.",
+          "$ref": "#/$defs/semver"
+        },
+        "release_notes_url": { "$ref": "#/$defs/url" },
+        "premium": {
+          "description": "The component needs a licence (a premium add-on). Defaults to false. Installing or updating it goes through the licence check; the version rules are the same as for any component.",
+          "type": "boolean"
+        },
+        "distributions": {
+          "description": "Limit the entry to the desktop installer or the pip package. Absent means both.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["desktop", "pip"] }
         }
       }
     },

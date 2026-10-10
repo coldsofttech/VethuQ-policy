@@ -7,6 +7,11 @@ schema major (`/v1/`) and their `sequence` number, not by release tags.
 ## [Unreleased]
 
 ### Added
+- Policy schema v1 `components` (additive, optional): `latest` / `minimum_supported` / `release_notes_url` /
+  `distributions` / `premium` per separately released component, keyed by Python distribution name (`vethuq-core`,
+  `vethuq-cli`, `vethuq-ui`, `vethuq-addon-<name>`), so releasing one component does not change the app-level
+  `versions`. Validator check (`minimum_supported` not above `latest`), example `with-components.payload.json`,
+  tests and docs (`docs/schema-v1.md`). Client side: coldsofttech/VethuQ-support#277.
 - Update check (#97): `features.<name>.message` (additive, optional) so a feature held back for an older client
   can carry its own explanation; documented the client rules for `latest` / `minimum_supported` (policy is the only
   source, pre-release form, local features never blocked); example `with-update.payload.json`.

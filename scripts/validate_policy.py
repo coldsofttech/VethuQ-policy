@@ -131,6 +131,12 @@ class PolicyValidator:
                     errs.append(f"versions.{dist}: minimum_supported is greater than latest")
             except (KeyError, AttributeError, TypeError):
                 pass  # reported by the schema check
+        for name, c in (p.get("components") or {}).items():
+            try:
+                if self._semver(c["minimum_supported"]) > self._semver(c["latest"]):
+                    errs.append(f"components.{name}: minimum_supported is greater than latest")
+            except (KeyError, AttributeError, TypeError):
+                pass  # reported by the schema check
         addon = (p.get("compatibility") or {}).get("addon_api")
         if addon:
             try:
